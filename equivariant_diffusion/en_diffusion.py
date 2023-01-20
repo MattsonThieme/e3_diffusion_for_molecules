@@ -6,6 +6,9 @@ from egnn import models
 from torch.nn import functional as F
 from equivariant_diffusion import utils as diffusion_utils
 
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
 
 # Defining some useful util functions.
 def expm1(x: torch.Tensor) -> torch.Tensor:
@@ -293,6 +296,9 @@ class EnVariationalDiffusion(torch.nn.Module):
 
         if noise_schedule != 'learned':
             self.check_issues_norm_values()
+        
+        # Initialize seed_mol
+        self.seed_mol = None
 
     def check_issues_norm_values(self, num_stdevs=8):
         zeros = torch.zeros((1, 1))
@@ -744,6 +750,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         )
         return zs
 
+    # TODO: add user defined input option here, don't sample noise, just pass the defined molecule through
     def sample_combined_position_feature_noise(self, n_samples, n_nodes, node_mask):
         """
         Samples mean-centered normal noise for z_x, and standard normal noise for z_h.
@@ -756,12 +763,34 @@ class EnVariationalDiffusion(torch.nn.Module):
             node_mask=node_mask)
         z = torch.cat([z_x, z_h], dim=2)
         return z
+    
+    # Generate a conformer from the given SMILES string, save to a class variable 
+    # for use in the initial sampling step
+    def gen_seed(self, seed_mol):
+
+        # Conformer generation
+        print("\nGenerating conformer for: {}\n".format(seed_mol))
+        m = Chem.MolFromSmiles(seed_mol)
+
+        # Add hydrogens
+        m = Chem.AddHs(m)
+
+        # Embed in 3D
+        AllChem.EmbedMolecule(m)
+
+        # Extract the coordinates
+        block = Chem.MolToMolBlock(m)
+        
 
     @torch.no_grad()
-    def sample(self, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False):
+    def sample(self, args, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False):
         """
         Draw samples from the generative model.
         """
+        # TODO: pass user defined seed here
+        if args.seed_mol:
+            self.gen_seed(args.seed_mol)
+
         if fix_noise:
             # Noise is broadcasted over the batch axis, useful for visualizations.
             z = self.sample_combined_position_feature_noise(1, n_nodes, node_mask)

@@ -188,6 +188,10 @@ def save_and_sample_conditional(args, device, model, prop_dist, dataset_info, ep
 
 def main_qualitative(args):
     args_gen = get_args_gen(args.generators_path)
+
+    # Hacky, but add the seed_mol argument here
+    args_gen.seed_mol = args.seed_mol
+    
     dataloaders = get_dataloader(args_gen)
     property_norms = compute_mean_mad(dataloaders, args_gen.conditioning, args_gen.dataset)
     model, nodes_dist, prop_dist, dataset_info = get_generator(args.generators_path,
@@ -220,6 +224,8 @@ if __name__ == "__main__":
                         help='naive, edm, qm9_second_half, qualitative')
     parser.add_argument('--n_sweeps', type=int, default=10,
                         help='number of sweeps for the qualitative conditional experiment')
+    parser.add_argument('--seed_mol', type=str, default=None,
+                        help='seed molecule for the generator, SMILES format')
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and torch.cuda.is_available()
