@@ -1,3 +1,6 @@
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -106,6 +109,32 @@ def sample_chain(args, device, flow, n_tries, dataset_info, prop_dist=None):
 
     return one_hot, charges, x
 
+# Only allow a seed if it contains only the allowed atoms
+def seed_allowed(seed):
+
+    # First check that seed_mol contains only the allowed atoms
+    allowed = set(['H', 'C', 'N', 'O', 'F'])
+    atoms = ''.join([i for i in seed if i.isalpha()]).upper()
+
+    allowed = all([i in allowed for i in atoms])
+
+    return allowed
+
+# Get edge mask for a given seed
+def seed_edge_mask(seed, num_atoms, max_n_nodes, batch_size):
+    adj = torch.tensor(Chem.GetAdjacencyMatrix(seed))
+    adj = adj + torch.eye(adj.shape[0])
+
+    # Pad to size
+    to_pad = int(max_n_nodes - num_atoms)
+    adj = F.pad(input=adj, pad=(0, to_pad, 0, to_pad), mode='constant', value=0.0)
+
+    # Shape into batch
+    edge_mask = torch.stack([adj for _ in range(batch_size)])
+
+    return edge_mask
+
+
 
 def sample(args, device, generative_model, dataset_info,
            prop_dist=None, nodesxsample=torch.tensor([10]), context=None,
@@ -114,6 +143,24 @@ def sample(args, device, generative_model, dataset_info,
 
     assert int(torch.max(nodesxsample)) <= max_n_nodes
     batch_size = len(nodesxsample)
+
+    # Max out the number of nodes in the generated molecules
+    # for i in range(batch_size):
+    #     nodesxsample[i] = max_n_nodes
+    
+    # Set number of nodes to the number of given nodes if seed_mol is provided
+    if args.seed_mol and seed_allowed(args.seed_mol):
+
+        m = Chem.MolFromSmiles(args.seed_mol)
+        m = Chem.AddHs(m)
+        num_atoms = 0
+        for atom in m.GetAtoms():
+            num_atoms += 1.0
+        
+        for i in range(batch_size):
+            nodesxsample[i] = num_atoms
+    else:
+        raise Exception("Seed molecule must contain only H, C, N, O, or F.")
 
     node_mask = torch.zeros(batch_size, max_n_nodes)
     for i in range(batch_size):
@@ -126,6 +173,10 @@ def sample(args, device, generative_model, dataset_info,
     edge_mask *= diag_mask
     edge_mask = edge_mask.view(batch_size * max_n_nodes * max_n_nodes, 1).to(device)
     node_mask = node_mask.unsqueeze(2).to(device)
+
+    # Fix edge mask if using seed_mol
+    if args.seed_mol:
+        edge_mask = seed_edge_mask(m, num_atoms, max_n_nodes, batch_size)
 
     # TODO FIX: This conditioning just zeros.
     if args.context_node_nf > 0:

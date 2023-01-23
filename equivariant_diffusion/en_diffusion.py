@@ -758,30 +758,58 @@ class EnVariationalDiffusion(torch.nn.Module):
         z_x = utils.sample_center_gravity_zero_gaussian_with_mask(
             size=(n_samples, n_nodes, self.n_dims), device=node_mask.device,
             node_mask=node_mask)
+
+        # atom types (H, C, N, O, F)
         z_h = utils.sample_gaussian_with_mask(
             size=(n_samples, n_nodes, self.in_node_nf), device=node_mask.device,
             node_mask=node_mask)
         z = torch.cat([z_x, z_h], dim=2)
         return z
     
-    # Generate a conformer from the given SMILES string, save to a class variable 
-    # for use in the initial sampling step
-    def gen_seed(self, seed_mol):
+    # Generate a conformer of the provided molecule
+    def gen_conf(self, args, node_mask):
 
-        # Conformer generation
-        print("\nGenerating conformer for: {}\n".format(seed_mol))
-        m = Chem.MolFromSmiles(seed_mol)
-
-        # Add hydrogens
+        m = Chem.MolFromSmiles(args.seed_mol)
         m = Chem.AddHs(m)
 
-        # Embed in 3D
-        AllChem.EmbedMolecule(m)
+        # Get number of atoms including Hs
+        num_atoms = 0
+        for atom in m.GetAtoms():
+            num_atoms += 1
 
-        # Extract the coordinates
+        # Embed the molecule in R3, this uses the ETKDG method
+        AllChem.EmbedMolecule(m,randomSeed=0xf00d)
         block = Chem.MolToMolBlock(m)
-        
 
+        # Grab coordinates, start at the 4th line of the block
+        block = np.array([i.split() for i in list(block.splitlines())][4:4+num_atoms])
+        coords = torch.tensor(block[:, :3].astype(float))
+
+        # Normalize to have mean zero and std 1
+        coords = coords - coords.mean(dim=0)
+        coords = coords / coords.std(dim=0)
+
+        # Pad
+        max_nodes = node_mask.shape[1]
+        to_pad = max_nodes - num_atoms
+        coords = F.pad(input=coords, pad=(0, 0, 0, to_pad), mode='constant', value=0)
+
+        # Grab atom types
+        types = block[:, 3]
+        order = ['H', 'C', 'N', 'O', 'F']
+        h = torch.zeros((coords.shape[0], len(order)))
+        for atom, atom_type in enumerate(types):
+            h[atom][order.index(atom_type)] += 1.0
+
+        # z vector
+        z = torch.cat((coords, h), dim=1)
+
+        # Stack into batch
+        batch_size = node_mask.shape[0]
+        z = torch.stack([z for _ in range(batch_size)])
+
+        return z.double()
+        
     @torch.no_grad()
     def sample(self, args, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False):
         """
@@ -789,13 +817,14 @@ class EnVariationalDiffusion(torch.nn.Module):
         """
         # TODO: pass user defined seed here
         if args.seed_mol:
-            self.gen_seed(args.seed_mol)
-
-        if fix_noise:
-            # Noise is broadcasted over the batch axis, useful for visualizations.
-            z = self.sample_combined_position_feature_noise(1, n_nodes, node_mask)
+            z = self.gen_conf(args, node_mask)
+            z = z.to(node_mask.device)
         else:
-            z = self.sample_combined_position_feature_noise(n_samples, n_nodes, node_mask)
+            if fix_noise:
+                # Noise is broadcasted over the batch axis, useful for visualizations.
+                z = self.sample_combined_position_feature_noise(1, n_nodes, node_mask)
+            else:
+                z = self.sample_combined_position_feature_noise(n_samples, n_nodes, node_mask)
 
         diffusion_utils.assert_mean_zero_with_mask(z[:, :, :self.n_dims], node_mask)
 
