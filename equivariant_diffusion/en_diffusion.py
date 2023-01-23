@@ -8,6 +8,7 @@ from equivariant_diffusion import utils as diffusion_utils
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from tqdm import tqdm
 
 
 # Defining some useful util functions.
@@ -287,7 +288,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         self.n_dims = n_dims
         self.num_classes = self.in_node_nf - self.include_charges
 
-        self.T = timesteps
+        self.T = 100 # timesteps
         self.parametrization = parametrization
 
         self.norm_values = norm_values
@@ -829,7 +830,8 @@ class EnVariationalDiffusion(torch.nn.Module):
         diffusion_utils.assert_mean_zero_with_mask(z[:, :, :self.n_dims], node_mask)
 
         # Iteratively sample p(z_s | z_t) for t = 1, ..., T, with s = t - 1.
-        for s in reversed(range(0, self.T)):
+        print("\nSampling p(z_s | z_t) for t = 1, ..., T...\n")
+        for s in tqdm(reversed(range(0, self.T))):
             s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
             t_array = s_array + 1
             s_array = s_array / self.T

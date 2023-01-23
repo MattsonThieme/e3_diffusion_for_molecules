@@ -12,6 +12,8 @@ from qm9.property_prediction import main_qm9_prop
 from qm9.sampling import sample_chain, sample, sample_sweep_conditional
 import qm9.visualizer as vis
 
+torch.set_default_dtype(torch.float64)
+
 
 def get_classifier(dir_path='', device='cpu'):
     with open(join(dir_path, 'args.pickle'), 'rb') as f:
@@ -224,7 +226,7 @@ if __name__ == "__main__":
                         help='naive, edm, qm9_second_half, qualitative')
     parser.add_argument('--n_sweeps', type=int, default=10,
                         help='number of sweeps for the qualitative conditional experiment')
-    parser.add_argument('--seed_mol', type=str, default=None,
+    parser.add_argument('--seed_mol', type=str, default=False,
                         help='seed molecule for the generator, SMILES format')
 
     args = parser.parse_args()
