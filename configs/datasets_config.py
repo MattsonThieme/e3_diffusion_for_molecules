@@ -183,6 +183,11 @@ geom_no_h = {
 
 
 def get_dataset_info(dataset_name, remove_h):
+    if dataset_name == 'protac':
+        if not remove_h:
+            return protac_with_h
+        else:
+            raise Exception('Missing config for %s without hydrogens' % dataset_name)
     if dataset_name == 'qm9':
         if not remove_h:
             return qm9_with_h

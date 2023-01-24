@@ -10,6 +10,7 @@ import wandb
 from configs.datasets_config import get_dataset_info
 from os.path import join
 from qm9 import dataset
+# from protac import dataset
 from qm9.models import get_optim, get_model
 from equivariant_diffusion import en_diffusion
 from equivariant_diffusion.utils import assert_correctly_masked
@@ -72,11 +73,11 @@ parser.add_argument('--sin_embedding', type=eval, default=False,
 # <-- EGNN args
 parser.add_argument('--ode_regularization', type=float, default=1e-3)
 parser.add_argument('--dataset', type=str, default='qm9',
-                    help='qm9 | qm9_second_half (train only on the last 50K samples of the training dataset)')
+                    help='protac | protac_second_half (train only on the last 1/2 samples of the training dataset)')
 parser.add_argument('--datadir', type=str, default='qm9/temp',
-                    help='qm9 directory')
+                    help='protac directory')
 parser.add_argument('--filter_n_atoms', type=int, default=None,
-                    help='When set to an integer value, QM9 will only contain molecules of that amount of atoms')
+                    help='When set to an integer value,  will only contain molecules of that amount of atoms')
 parser.add_argument('--dequantization', type=str, default='argmax_variational',
                     help='uniform | variational | argmax_variational | deterministic')
 parser.add_argument('--n_report_steps', type=int, default=1)
@@ -156,8 +157,6 @@ if args.resume is not None:
     print(args)
 
 utils.create_folders(args)
-# print(args)
-
 
 # Wandb config
 if args.no_wandb:

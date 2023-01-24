@@ -288,7 +288,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         self.n_dims = n_dims
         self.num_classes = self.in_node_nf - self.include_charges
 
-        self.T = 100 # timesteps
+        self.T = timesteps
         self.parametrization = parametrization
 
         self.norm_values = norm_values
