@@ -780,20 +780,24 @@ class EnVariationalDiffusion(torch.nn.Module):
         coords = coords - coords.mean(dim=0)
         coords = coords / coords.std(dim=0)
 
-        # Pad
-        max_nodes = node_mask.shape[1]
-        to_pad = max_nodes - num_atoms
-        coords = F.pad(input=coords, pad=(0, 0, 0, to_pad), mode='constant', value=0)
-
         # Grab atom types
         types = block[:, 3]
         order = ['H', 'C', 'N', 'O', 'F']
         h = torch.zeros((coords.shape[0], len(order)))
         for atom, atom_type in enumerate(types):
             h[atom][order.index(atom_type)] += 1.0
+        
+        # Normalize to have mean zero and std 1
+        h = h - h.mean(dim=1).unsqueeze(1)
+        h = h / h.std(dim=1).unsqueeze(1)
 
         # z vector
         z = torch.cat((coords, h), dim=1)
+
+        # Pad
+        max_nodes = node_mask.shape[1]
+        to_pad = max_nodes - num_atoms
+        z = F.pad(input=z, pad=(0, 0, 0, to_pad), mode='constant', value=0)
 
         # Stack into batch
         batch_size = node_mask.shape[0]
