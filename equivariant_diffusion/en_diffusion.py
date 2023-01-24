@@ -86,7 +86,6 @@ def gaussian_entropy(mu, sigma):
 
 def gaussian_KL(q_mu, q_sigma, p_mu, p_sigma, node_mask):
     """Computes the KL distance between two normal distributions.
-
         Args:
             q_mu: Mean of distribution q.
             q_sigma: Standard deviation of distribution q.
@@ -106,7 +105,6 @@ def gaussian_KL(q_mu, q_sigma, p_mu, p_sigma, node_mask):
 
 def gaussian_KL_for_dimension(q_mu, q_sigma, p_mu, p_sigma, d):
     """Computes the KL distance between two normal distributions.
-
         Args:
             q_mu: Mean of distribution q.
             q_sigma: Standard deviation of distribution q.
@@ -384,7 +382,6 @@ class EnVariationalDiffusion(torch.nn.Module):
     def sigma_and_alpha_t_given_s(self, gamma_t: torch.Tensor, gamma_s: torch.Tensor, target_tensor: torch.Tensor):
         """
         Computes sigma t given s, using gamma_t and gamma_s. Used during sampling.
-
         These are defined as:
             alpha t given s = alpha t / alpha s,
             sigma t given s = sqrt(1 - (alpha t given s) ^2 ).
@@ -408,7 +405,6 @@ class EnVariationalDiffusion(torch.nn.Module):
 
     def kl_prior(self, xh, node_mask):
         """Computes the KL between q(z1 | x) and the prior p(z1) = Normal(0, 1).
-
         This is essentially a lot of work for something that is in practice negligible in the loss. However, you
         compute it so that you see it when you've made a mistake in your noise schedule.
         """
@@ -805,6 +801,7 @@ class EnVariationalDiffusion(torch.nn.Module):
 
         return z.double()
 
+    @torch.no_grad()
     def sample(self, args, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False):
         """
         Draw samples from the generative model.
@@ -812,8 +809,8 @@ class EnVariationalDiffusion(torch.nn.Module):
         # TODO: pass user defined seed here
         if args.seed_mol:
             z = self.gen_conf(args, node_mask)
-            z = z.to(node_mask.device).double()
-        else:
+            z = z.to(node_mask.device).type(torch.float32)
+            
             if fix_noise:
                 # Noise is broadcasted over the batch axis, useful for visualizations.
                 z = self.sample_combined_position_feature_noise(1, n_nodes, node_mask)

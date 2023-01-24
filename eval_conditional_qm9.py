@@ -12,7 +12,7 @@ from qm9.property_prediction import main_qm9_prop
 from qm9.sampling import sample_chain, sample, sample_sweep_conditional
 import qm9.visualizer as vis
 
-torch.set_default_dtype(torch.float64)
+# torch.set_default_dtype(torch.float64)
 torch.cuda.empty_cache()
 
 def get_classifier(dir_path='', device='cpu'):

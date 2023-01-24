@@ -165,8 +165,8 @@ def sample(args, device, generative_model, dataset_info,
 
     node_mask = torch.zeros(batch_size, max_n_nodes)
     for i in range(batch_size):
-        node_mask[i, 0:nodesxsample[i]] = 1
-    node_mask = node_mask.double()
+        node_mask[i, 0:nodesxsample[i]] = 1.0
+    node_mask = node_mask  #.double()
 
     # Compute edge_mask
 
@@ -179,7 +179,7 @@ def sample(args, device, generative_model, dataset_info,
     # Fix edge mask if using seed_mol
     if args.seed_mol:
         edge_mask = seed_edge_mask(m, num_atoms, max_n_nodes, batch_size)
-        edge_mask = edge_mask.double().to(device)
+        edge_mask = edge_mask.to(device)
 
     # TODO FIX: This conditioning just zeros.
     if args.context_node_nf > 0:
