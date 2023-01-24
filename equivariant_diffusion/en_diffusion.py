@@ -814,7 +814,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         if args.seed_mol:
             z = self.gen_conf(args, node_mask)
             z = z.to(node_mask.device).type(torch.float32)
-            
+        else:
             if fix_noise:
                 # Noise is broadcasted over the batch axis, useful for visualizations.
                 z = self.sample_combined_position_feature_noise(1, n_nodes, node_mask)
