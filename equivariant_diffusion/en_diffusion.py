@@ -1,3 +1,6 @@
+from rdkit import Chem
+from rdkit.Chem import AllChem
+
 from equivariant_diffusion import utils
 import numpy as np
 import math
@@ -5,6 +8,7 @@ import torch
 from egnn import models
 from torch.nn import functional as F
 from equivariant_diffusion import utils as diffusion_utils
+from tqdm import tqdm
 
 
 # Defining some useful util functions.
@@ -757,21 +761,70 @@ class EnVariationalDiffusion(torch.nn.Module):
         z = torch.cat([z_x, z_h], dim=2)
         return z
 
-    @torch.no_grad()
-    def sample(self, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False):
+    # Generate a conformer of the provided molecule
+    def gen_conf(self, args, node_mask):
+
+        m = Chem.MolFromSmiles(args.seed_mol)
+        m = Chem.AddHs(m)
+
+        # Get number of atoms including Hs
+        num_atoms = 0
+        for atom in m.GetAtoms():
+            num_atoms += 1
+
+        # Embed the molecule in R3, this uses the ETKDG method
+        AllChem.EmbedMolecule(m,randomSeed=0xf00d)
+        block = Chem.MolToMolBlock(m)
+
+        # Grab coordinates, start at the 4th line of the block
+        block = np.array([i.split() for i in list(block.splitlines())][4:4+num_atoms])
+        coords = torch.tensor(block[:, :3].astype(float))
+
+        # Normalize to have mean zero and std 1
+        coords = coords - coords.mean(dim=0)
+        coords = coords / coords.std(dim=0)
+
+        # Pad
+        max_nodes = node_mask.shape[1]
+        to_pad = max_nodes - num_atoms
+        coords = F.pad(input=coords, pad=(0, 0, 0, to_pad), mode='constant', value=0)
+
+        # Grab atom types
+        types = block[:, 3]
+        order = ['H', 'C', 'N', 'O', 'F']
+        h = torch.zeros((coords.shape[0], len(order)))
+        for atom, atom_type in enumerate(types):
+            h[atom][order.index(atom_type)] += 1.0
+
+        # z vector
+        z = torch.cat((coords, h), dim=1)
+
+        # Stack into batch
+        batch_size = node_mask.shape[0]
+        z = torch.stack([z for _ in range(batch_size)])
+
+        return z.double()
+
+    def sample(self, args, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False):
         """
         Draw samples from the generative model.
         """
-        if fix_noise:
-            # Noise is broadcasted over the batch axis, useful for visualizations.
-            z = self.sample_combined_position_feature_noise(1, n_nodes, node_mask)
+        # TODO: pass user defined seed here
+        if args.seed_mol:
+            z = self.gen_conf(args, node_mask)
+            z = z.to(node_mask.device).double()
         else:
-            z = self.sample_combined_position_feature_noise(n_samples, n_nodes, node_mask)
+            if fix_noise:
+                # Noise is broadcasted over the batch axis, useful for visualizations.
+                z = self.sample_combined_position_feature_noise(1, n_nodes, node_mask)
+            else:
+                z = self.sample_combined_position_feature_noise(n_samples, n_nodes, node_mask)
 
         diffusion_utils.assert_mean_zero_with_mask(z[:, :, :self.n_dims], node_mask)
 
         # Iteratively sample p(z_s | z_t) for t = 1, ..., T, with s = t - 1.
-        for s in reversed(range(0, self.T)):
+        print("\nSampling p(z_s | z_t) for t = 1, ..., T...\n")
+        for s in tqdm(reversed(range(0, self.T))):
             s_array = torch.full((n_samples, 1), fill_value=s, device=z.device)
             t_array = s_array + 1
             s_array = s_array / self.T
