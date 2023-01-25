@@ -781,7 +781,7 @@ class EnVariationalDiffusion(torch.nn.Module):
 
         N = node_mask.sum(1)[0].item()
         mean = torch.sum(coords, dim=1, keepdim=True) / N
-        coords = coords - mean
+        coords = coords - coords.mean(dim=0)  # mean
         coords = coords / coords.std()
 
         # Grab atom types
@@ -791,9 +791,9 @@ class EnVariationalDiffusion(torch.nn.Module):
         for atom, atom_type in enumerate(types):
             h[atom][order.index(atom_type)] = 1.0
         
-        # Add gaussian noise
-        noise = torch.randn(h.shape) / 10
-        h = h + noise
+        # Add slight gaussian noise
+        # noise = torch.randn(h.shape) / 100
+        # h = h + noise
 
         # Normalize to have mean zero and std 1
         h = h - h.mean(dim=1).unsqueeze(1)

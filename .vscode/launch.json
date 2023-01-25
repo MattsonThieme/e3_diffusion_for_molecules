@@ -1,0 +1,24 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [ 
+                "--generators_path", "outputs/exp_35_conditional_nf192_9l_alpha",
+                "--classifiers_path", "qm9/property_prediction/outputs/exp_class_alpha_pretrained",
+                // "--seed_mol", "CC(=O)NC1=CC=C(O)C=C1" // Acetaminophen 
+                // "--seed_mol", "CC(=O)Oc1ccccc1C(O)=O" // Aspirin
+                "--seed_mol", "N1N=CC=CC2=CC=CC=C12"  // Benzodiazepine
+
+            ]
+        }
+    ]
+}
