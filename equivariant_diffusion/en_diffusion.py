@@ -740,7 +740,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         zs = torch.cat(
             [diffusion_utils.remove_mean_with_mask(zs[:, :, :self.n_dims],
                                                    node_mask),
-             zs[:, :, self.n_dims:]], dim=2
+            zs[:, :, self.n_dims:]], dim=2
         )
         return zs
 
@@ -774,22 +774,31 @@ class EnVariationalDiffusion(torch.nn.Module):
 
         # Grab coordinates, start at the 4th line of the block
         block = np.array([i.split() for i in list(block.splitlines())][4:4+num_atoms])
-        coords = torch.tensor(block[:, :3].astype(float))
+        coords = torch.tensor(block[:, :3].astype(float)).to(node_mask.device)
 
         # Normalize to have mean zero and std 1
-        coords = coords - coords.mean(dim=0)
-        coords = coords / coords.std(dim=0)
+        # coords = coords - coords.mean(dim=0)
+
+        N = node_mask.sum(1)[0].item()
+        mean = torch.sum(coords, dim=1, keepdim=True) / N
+        coords = coords - mean
+        coords = coords / coords.std()
 
         # Grab atom types
         types = block[:, 3]
         order = ['H', 'C', 'N', 'O', 'F']
         h = torch.zeros((coords.shape[0], len(order)))
         for atom, atom_type in enumerate(types):
-            h[atom][order.index(atom_type)] += 1.0
+            h[atom][order.index(atom_type)] = 1.0
         
+        # Add gaussian noise
+        noise = torch.randn(h.shape) / 10
+        h = h + noise
+
         # Normalize to have mean zero and std 1
         h = h - h.mean(dim=1).unsqueeze(1)
         h = h / h.std(dim=1).unsqueeze(1)
+        h = h.to(node_mask.device)
 
         # z vector
         z = torch.cat((coords, h), dim=1)
@@ -803,7 +812,7 @@ class EnVariationalDiffusion(torch.nn.Module):
         batch_size = node_mask.shape[0]
         z = torch.stack([z for _ in range(batch_size)])
 
-        return z.double()
+        return z.to(node_mask.device).type(torch.float32)
 
     @torch.no_grad()
     def sample(self, args, n_samples, n_nodes, node_mask, edge_mask, context, fix_noise=False):
@@ -813,7 +822,6 @@ class EnVariationalDiffusion(torch.nn.Module):
         # TODO: pass user defined seed here
         if args.seed_mol:
             z = self.gen_conf(args, node_mask)
-            z = z.to(node_mask.device).type(torch.float32)
         else:
             if fix_noise:
                 # Noise is broadcasted over the batch axis, useful for visualizations.

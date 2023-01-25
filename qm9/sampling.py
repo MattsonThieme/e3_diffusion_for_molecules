@@ -124,7 +124,7 @@ def seed_allowed(seed):
 # Get edge mask for a given seed
 def seed_edge_mask(seed, num_atoms, max_n_nodes, batch_size):
     adj = torch.tensor(Chem.GetAdjacencyMatrix(seed))
-    adj = adj + torch.eye(adj.shape[0])
+    # adj = adj + torch.eye(adj.shape[0])
 
     # Pad to size
     to_pad = int(max_n_nodes - num_atoms)
@@ -160,6 +160,7 @@ def sample(args, device, generative_model, dataset_info,
         
         for i in range(batch_size):
             nodesxsample[i] = num_atoms
+
     elif args.seed_mol:
         raise Exception("Seed molecule must contain only H, C, N, O, or F.")
 
@@ -173,13 +174,13 @@ def sample(args, device, generative_model, dataset_info,
     edge_mask = node_mask.unsqueeze(1) * node_mask.unsqueeze(2)
     diag_mask = ~torch.eye(edge_mask.size(1), dtype=torch.bool).unsqueeze(0)
     edge_mask *= diag_mask
-    edge_mask = edge_mask.view(batch_size * max_n_nodes * max_n_nodes, 1).to(device)
+    edge_mask = edge_mask.view(batch_size * max_n_nodes * max_n_nodes, 1).to(device)  # Produces a fully connected graph without self-loops
     node_mask = node_mask.unsqueeze(2).to(device)
 
     # Fix edge mask if using seed_mol
-    if args.seed_mol:
-        edge_mask = seed_edge_mask(m, num_atoms, max_n_nodes, batch_size)
-        edge_mask = edge_mask.to(device)
+    # if args.seed_mol:
+    #     edge_mask = seed_edge_mask(m, num_atoms, max_n_nodes, batch_size)
+    #     edge_mask = edge_mask.to(device)
 
     # TODO FIX: This conditioning just zeros.
     if args.context_node_nf > 0:

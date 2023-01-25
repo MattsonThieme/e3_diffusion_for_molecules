@@ -36,8 +36,8 @@ def remove_mean_with_mask(x, node_mask):
     mean = torch.sum(x, dim=1, keepdim=True) / N
     x = x - mean * node_mask
 
-    std = torch.std(x, dim=1).unsqueeze(1)
-    x = x / std
+    # std = torch.std(x, dim=1).unsqueeze(1)
+    # x = x / std
 
     return x
 
